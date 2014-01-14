@@ -7,6 +7,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
 #include <linux/ip.h>
+#include <linux/tcp.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,23 +20,70 @@ using namespace std;
 
 struct ethhdr *hdr_ether;
 struct iphdr  *hdr_ip;
+struct tcphdr *hdr_tcp;
+
+void decodeTCPPacket(unsigned char *buffer, int size) {
+	hdr_tcp = (struct tcphdr*)buffer;
+
+	printf("\t\trcvlen:%4d\t", size);
+
+	int src = ((int)buffer[0] << 8) + buffer[1];
+	int des = ((int)buffer[2] << 8) + buffer[3];
+	printf("%d -> %d\n", src, des);
+}
 
 void decodeIPPacket(unsigned char *buffer, int size) {
 	hdr_ip = (struct iphdr*)buffer;
 
 	printf("\trcvlen:%4d\t", size);
 
+	// version
 	int version = hdr_ip->version;
-	printf("version: %d\n\t", version);
+	printf("version: %d\t", version);
 	switch (version) {
 		case 4:
+			// header length
 			printf("header length: %d\t", hdr_ip->ihl);
 
+			// total length
+			printf("total length: %d\n\t", hdr_ip->tot_len);
+
+			// IP address
 			struct in_addr ip_addr;
 			ip_addr.s_addr = hdr_ip->saddr;
-			printf("%s -> ", inet_ntoa(ip_addr));
+			printf("%-15s -> ", inet_ntoa(ip_addr));
 			ip_addr.s_addr = hdr_ip->daddr;
-			printf("%s\t", inet_ntoa(ip_addr));
+			printf("%-15s\t", inet_ntoa(ip_addr));
+
+			// TTL
+			printf("TTL: %3d\t", hdr_ip->ttl);
+
+			// Protocol
+			printf("Protocol: ");
+			switch (hdr_ip->protocol) {
+				// ICMP
+				case 0x01:
+					printf("ICMP\n");
+					break;
+
+				// IGMP
+				case 0x02:
+					printf("IGMP\n");
+					break;
+
+				// TCP
+				case 0x06:
+					printf("TCP\n");
+					decodeTCPPacket(&buffer[hdr_ip->ihl * 4], size - hdr_ip->ihl * 4);
+					break;
+				// UDP
+				case 0x11:
+					printf("UDP\n");
+					break;
+
+				default:
+					printf("%2X\n", hdr_ip->protocol);
+			};			
 			break;
 		case 6:
 			break;
@@ -99,7 +147,8 @@ int main() {
 			// error handling
 		} else {
 			// cout << buffer << endl;
-			decodeEtherFrame(buffer, length);
+//			if (buffer[23] == 6)
+				decodeEtherFrame(buffer, length);
 		}
 	}
 
