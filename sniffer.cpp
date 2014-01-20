@@ -22,14 +22,61 @@ struct ethhdr *hdr_ether;
 struct iphdr  *hdr_ip;
 struct tcphdr *hdr_tcp;
 
+void dumpData(unsigned char *data, int size) {
+	char a , line[17] , c;
+	int j;
+
+	printf("\t\t");
+
+	//loop over each character and print
+	for(int i=0 ; i < size ; i++) {
+		c = data[i];
+
+		//Print the hex value for every character , with a space. Important to make unsigned
+		printf("%.2x ", (unsigned char) c);
+
+		//Add the character to data line. Important to make unsigned
+		a = ( c >=32 && c <=128) ? (unsigned char) c : '.';
+
+		line[i % 16] = a;
+
+		//if last character of a line , then print the line - 16 characters in 1 line
+		if ( (i != 0 && (i + 1) % 16 == 0) || i == size - 1) {
+			line[i % 16 + 1] = '\0';
+
+			//print a big gap of 10 characters between hex and characters
+			printf("\t");
+
+			//Print additional spaces for last lines which might be less than 16 characters in length
+			for( j = strlen(line) ; j < 16; j++)
+			{
+				printf("   ");
+			}
+
+			printf("%s\n\t\t" , line);
+		}
+	}
+
+	printf("\n");
+}
+
 void decodeTCPPacket(unsigned char *buffer, int size) {
 	hdr_tcp = (struct tcphdr*)buffer;
 
-	printf("\t\trcvlen:%4d\t", size);
+	printf("\t\trcvlen: %4d\t", size);
 
 	int src = ((int)buffer[0] << 8) + buffer[1];
 	int des = ((int)buffer[2] << 8) + buffer[3];
-	printf("%d -> %d\n", src, des);
+
+	// Port number
+	printf("%d -> %d\t", src, des);
+
+	// Data offset (the size of the TCP header in 32-bit words)
+	int hdr_len = hdr_tcp->doff * 4;
+	printf("header length: %d\n", hdr_len);
+
+	// if (src == 80 || des == 80)
+		dumpData(&buffer[hdr_len], size - hdr_len);
 }
 
 void decodeIPPacket(unsigned char *buffer, int size) {
@@ -76,6 +123,7 @@ void decodeIPPacket(unsigned char *buffer, int size) {
 					printf("TCP\n");
 					decodeTCPPacket(&buffer[hdr_ip->ihl * 4], size - hdr_ip->ihl * 4);
 					break;
+
 				// UDP
 				case 0x11:
 					printf("UDP\n");
@@ -147,7 +195,7 @@ int main() {
 			// error handling
 		} else {
 			// cout << buffer << endl;
-//			if (buffer[23] == 6)
+			// if (buffer[23] == 6)
 				decodeEtherFrame(buffer, length);
 		}
 	}
